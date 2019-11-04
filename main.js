@@ -15,7 +15,11 @@ Apify.main(async () => {
         const startUrl = input.startUrls[index].url;
 
         if (startUrl.includes('https://www.firmy.cz')) {
-            await requestQueue.addRequest({ url: input.startUrls[index].url, userData: { label: 'list' } });
+            if (startUrl.includes('/detail/')) {
+                await requestQueue.addRequest({ url: input.startUrls[index].url, userData: { label: 'item' } });
+            } else {
+                await requestQueue.addRequest({ url: input.startUrls[index].url, userData: { label: 'list' } });
+            }
         }
     }
 
@@ -50,7 +54,7 @@ Apify.main(async () => {
 
                     if (itemUrl.includes('https://www.firmy.cz/detail/')) {
                         await requestQueue.addRequest({ url: `${itemUrl}`, userData: { label: 'item' } },
-                        { forefront: true });
+                            { forefront: true });
                     }
                 }
 

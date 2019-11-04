@@ -9,7 +9,7 @@
             "editor": "requestListSources",
             "description": "List of URLs that will be scraped or crawled.",
             "prefill": [
-                { "url": "https://www.imdb.com/search/title/" }
+                { "url": "https://www.firmy.cz/Remesla-a-sluzby/Pocitacove-a-internetove-sluzby/Webdesignove-sluzby?x=14.4266722222&y=50.0814916667&rt=adresa&platba-kartou" }
             ]
         },
         "maxItems": {
