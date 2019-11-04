@@ -1,8 +1,23 @@
 const Apify = require('apify');
 
 Apify.main(async () => {
+    const input = await Apify.getInput();
+    console.log('Input:');
+    console.log(input);
+
+    if (!input || !Array.isArray(input.startUrls) || input.startUrls.length === 0) {
+        throw new Error("Invalid input, it needs to contain at least one url in 'startUrls'.");
+    }
+
     const requestQueue = await Apify.openRequestQueue();
-    await requestQueue.addRequest({ url: 'https://www.firmy.cz/Remesla-a-sluzby/Pocitacove-a-internetove-sluzby/Webdesignove-sluzby?x=14.4266722222&y=50.0814916667&rt=adresa&platba-kartou', userData: { label: 'list' } });
+
+    for (let index = 0; index < input.startUrls.length; index++) {
+        const startUrl = input.startUrls[index].url;
+
+        if (startUrl.includes('https://www.firmy.cz')) {
+            await requestQueue.addRequest({ url: input.startUrls[index].url, userData: { label: 'list' } });
+        }
+    }
 
     const crawler = new Apify.PuppeteerCrawler({
         requestQueue,
@@ -32,13 +47,16 @@ Apify.main(async () => {
 
                 for (let index = 0; index < result.items.length; index++) {
                     const itemUrl = result.items[index];
-                    await requestQueue.addRequest({ url: `${itemUrl}`, userData: { label: 'item' } },
+
+                    if (itemUrl.includes('https://www.firmy.cz/detail/')) {
+                        await requestQueue.addRequest({ url: `${itemUrl}`, userData: { label: 'item' } },
                         { forefront: true });
+                    }
                 }
 
-                // if (result.nextPageUrl) {
-                //     await requestQueue.addRequest({ url: `${result.nextPageUrl}`, userData: { label: 'list' } });
-                // }
+                if (result.nextPageUrl) {
+                    await requestQueue.addRequest({ url: `${result.nextPageUrl}`, userData: { label: 'list' } });
+                }
             } else if (request.userData.label === 'item') {
                 await page.waitFor(5000); // to wait for 1000ms
                 const pageResult = await page.evaluate(() => {
@@ -74,6 +92,8 @@ Apify.main(async () => {
         maxRequestRetries: 2,
         maxRequestsPerCrawl: 10000,
         maxConcurrency: 5,
+
+        proxyConfiguration: input.proxyConfiguration,
     });
 
     await crawler.run();
