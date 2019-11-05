@@ -1,12 +1,29 @@
 const Apify = require('apify');
+const _ = require('underscore');
+const safeEval = require('safe-eval');
+
+const { puppeteer } = Apify.utils;
 
 Apify.main(async () => {
     const input = await Apify.getInput();
+
     console.log('Input:');
     console.log(input);
 
     if (!input || !Array.isArray(input.startUrls) || input.startUrls.length === 0) {
         throw new Error("Invalid input, it needs to contain at least one url in 'startUrls'.");
+    }
+
+    let extendOutputFunction;
+    if (typeof input.extendOutputFunction === 'string' && input.extendOutputFunction.trim() !== '') {
+        try {
+            extendOutputFunction = safeEval(input.extendOutputFunction);
+        } catch (e) {
+            throw new Error(`'extendOutputFunction' is not valid Javascript! Error: ${e}`);
+        }
+        if (typeof extendOutputFunction !== 'function') {
+            throw new Error('extendOutputFunction is not a function! Please fix it or use just default ouput!');
+        }
     }
 
     const requestQueue = await Apify.openRequestQueue();
@@ -63,21 +80,31 @@ Apify.main(async () => {
                 }
             } else if (request.userData.label === 'item') {
                 await page.waitFor(5000); // to wait for 1000ms
+                // Inject jQuery into a page
+                await puppeteer.injectJQuery(page);
                 const pageResult = await page.evaluate(() => {
                     return {
-                        title: document.querySelector('[itemprop=name]') ? document.querySelector('[itemprop=name]').textContent.trim() : '',
-                        address: document.querySelector('[itemprop=address]') ? document.querySelector('[itemprop=address]').textContent.trim() : '',
-                        latitude: document.querySelector('[itemprop=latitude]') ? document.querySelector('[itemprop=latitude]').content.trim() : '',
-                        longitude: document.querySelector('[itemprop=longitude]') ? document.querySelector('[itemprop=longitude]').content.trim() : '',
-                        description: document.querySelector('[itemprop=description]') ? document.querySelector('[itemprop=description]').textContent.trim() : '',
-                        category: document.querySelector('.category') ? document.querySelector('.category').textContent.trim() : '',
-                        rating: document.querySelector('[itemprop=ratingValue]') ? document.querySelector('[itemprop=ratingValue]').content.trim() : '',
-                        ratingCount: document.querySelector('[itemprop=ratingCount]') ? document.querySelector('[itemprop=ratingCount]').textContent.trim() : '',
-                        phone: document.querySelector('[itemprop=telephone]') ? document.querySelector('[itemprop=telephone]').textContent.trim() : '',
-                        email: document.querySelector('.companyMail') ? document.querySelector('.companyMail').textContent.trim() : '',
-                        website: document.querySelector('.companyUrl') ? document.querySelector('.companyUrl').textContent.trim() : '',
+                        title: $('[itemprop=name]') ? $('[itemprop=name]').text().trim() : '',
+                        address: $('[itemprop=address]') ? $('[itemprop=address]').text().trim() : '',
+                        latitude: $('[itemprop=latitude]') ? $('[itemprop=latitude]').attr('content').trim() : '',
+                        longitude: $('[itemprop=longitude]') ? $('[itemprop=longitude]').attr('content').trim() : '',
+                        description: $('[itemprop=description]') ? $('[itemprop=description]').text().trim() : '',
+                        category: $('.category') ? $('.category').text().trim() : '',
+                        rating: $('[itemprop=ratingValue]') ? $('[itemprop=ratingValue]').attr('content').trim() : '',
+                        ratingCount: $('[itemprop=ratingCount]') ? $('[itemprop=ratingCount]').text().trim() : '',
+                        phone: $('[itemprop=telephone]') ? $('[itemprop=telephone]').text().trim() : '',
+                        email: $('.companyMail') ? $('.companyMail').text().trim() : '',
+                        website: $('.companyUrl') ? $('.companyUrl').text().trim() : '',
                     };
                 });
+
+                if (extendOutputFunction) {
+                    const userResult = await page.evaluate((functionStr) => {
+                        const f = eval(functionStr);
+                        return f();
+                    }, input.extendOutputFunction);
+                    _.extend(pageResult, userResult);
+                }
 
                 pageResult.url = request.url;
                 pageResult['#debug'] = Apify.utils.createRequestDebugInfo(request);
