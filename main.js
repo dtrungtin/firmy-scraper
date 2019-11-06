@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 const Apify = require('apify');
 const _ = require('underscore');
 const safeEval = require('safe-eval');
@@ -6,7 +7,6 @@ const { puppeteer } = Apify.utils;
 
 Apify.main(async () => {
     const input = await Apify.getInput();
-
     console.log('Input:');
     console.log(input);
 
@@ -26,6 +26,10 @@ Apify.main(async () => {
         }
     }
 
+    const dataset = await Apify.openDataset();
+    const { itemCount } = await dataset.getInfo();
+    let pagesOutputted = itemCount;
+
     const requestQueue = await Apify.openRequestQueue();
 
     for (let index = 0; index < input.startUrls.length; index++) {
@@ -43,7 +47,7 @@ Apify.main(async () => {
     const crawler = new Apify.PuppeteerCrawler({
         requestQueue,
 
-        handlePageFunction: async ({ request, page }) => {
+        handlePageFunction: async ({ request, page, autoscaledPool }) => {
             console.log(`Processing ${request.url}...`);
 
             if (request.userData.label === 'list') {
@@ -100,6 +104,7 @@ Apify.main(async () => {
 
                 if (extendOutputFunction) {
                     const userResult = await page.evaluate((functionStr) => {
+                        // eslint-disable-next-line no-eval
                         const f = eval(functionStr);
                         return f();
                     }, input.extendOutputFunction);
@@ -110,6 +115,12 @@ Apify.main(async () => {
                 pageResult['#debug'] = Apify.utils.createRequestDebugInfo(request);
 
                 await Apify.pushData(pageResult);
+
+                if (++pagesOutputted >= input.maxItems) {
+                    const msg = `Outputted ${pagesOutputted} pages, limit is ${input.maxItems} pages`;
+                    console.log(`Shutting down the crawler: ${msg}`);
+                    autoscaledPool.abort();
+                }
             }
         },
 
@@ -119,10 +130,6 @@ Apify.main(async () => {
                 '#debug': Apify.utils.createRequestDebugInfo(request),
             });
         },
-
-        maxRequestRetries: 2,
-        maxRequestsPerCrawl: 10000,
-        maxConcurrency: 5,
 
         proxyConfiguration: input.proxyConfiguration,
     });
