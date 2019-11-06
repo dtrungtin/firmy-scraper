@@ -51,7 +51,7 @@ Apify.main(async () => {
             console.log(`Processing ${request.url}...`);
 
             if (request.userData.label === 'list') {
-                await page.waitFor(10000); // to wait for 1000ms
+                await page.waitFor(() => document.querySelector('div.lazyLoadBg') === null, { timeout: 10000 });
 
                 const result = await page.evaluate(() => {
                     const data = {};
@@ -83,9 +83,11 @@ Apify.main(async () => {
                     await requestQueue.addRequest({ url: `${result.nextPageUrl}`, userData: { label: 'list' } });
                 }
             } else if (request.userData.label === 'item') {
-                await page.waitFor(5000); // to wait for 1000ms
+                await page.waitFor(() => document.querySelector('div.lazyLoadBg') === null, { timeout: 10000 });
+
                 // Inject jQuery into a page
                 await puppeteer.injectJQuery(page);
+
                 const pageResult = await page.evaluate(() => {
                     return {
                         title: $('[itemprop=name]') ? $('[itemprop=name]').text().trim() : '',
