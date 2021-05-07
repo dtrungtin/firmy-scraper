@@ -7,7 +7,7 @@
 		"iltorb": "^2.4.4",
 		"request-promise": "^4.2.4",
 		"safe-eval": "^0.4.1",
-		"underscore": "^1.9.1"
+		"underscore": "^1.12.1"
 	},
 	"devDependencies": {
 		"@apify/eslint-config": "0.0.3",
